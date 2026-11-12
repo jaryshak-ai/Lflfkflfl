@@ -1,0 +1,661 @@
+# Положи в репозиторий как .github/workflows/build-shop.yml
+# Файл сам создаёт весь проект Shop (pom.xml, plugin.yml, shop.yml, Shop.java) и собирает jar.
+# Готовый jar: Actions -> последний запуск -> Artifacts -> Shop-jar
+name: Build Shop
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Create project files and build
+        run: |
+          set -e
+          mkdir -p src/main/java/shop src/main/resources
+          cat > pom.xml <<'EOF_SHOP'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+
+              <groupId>shop</groupId>
+              <artifactId>Shop</artifactId>
+              <version>1.0.0</version>
+              <packaging>jar</packaging>
+
+              <properties>
+                  <maven.compiler.source>17</maven.compiler.source>
+                  <maven.compiler.target>17</maven.compiler.target>
+                  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+              </properties>
+
+              <repositories>
+                  <repository>
+                      <id>lanink</id>
+                      <url>https://repo.lanink.cn/repository/maven-public/</url>
+                  </repository>
+              </repositories>
+
+              <dependencies>
+                  <dependency>
+                      <groupId>cn.nukkit</groupId>
+                      <artifactId>Nukkit</artifactId>
+                      <version>MOT-SNAPSHOT</version>
+                      <scope>provided</scope>
+                  </dependency>
+              </dependencies>
+
+              <build>
+                  <finalName>Shop-${project.version}</finalName>
+                  <plugins>
+                      <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-compiler-plugin</artifactId>
+                          <version>3.11.0</version>
+                          <configuration>
+                              <release>17</release>
+                              <encoding>UTF-8</encoding>
+                          </configuration>
+                      </plugin>
+                  </plugins>
+              </build>
+          </project>
+          EOF_SHOP
+          cat > src/main/resources/plugin.yml <<'EOF_SHOP'
+          name: Shop
+          main: shop.Shop
+          version: "1.0.0"
+          api: ["1.0.0"]
+          author: jaryshak
+          description: Системный магазин /shop на формах (покупка и продажа за монеты TpCoins)
+          depend: [TpCoins]
+
+          commands:
+            shop:
+              description: Открыть магазин
+              usage: /shop
+              permission: shop.use
+            shopreload:
+              description: Перезагрузить shop.yml
+              usage: /shopreload
+              permission: shop.reload
+
+          permissions:
+            shop.use:
+              description: Пользоваться магазином
+              default: "true"
+            shop.reload:
+              description: Перезагружать shop.yml
+              default: op
+          EOF_SHOP
+          cat > src/main/resources/shop.yml <<'EOF_SHOP'
+          # Магазин /shop. buy = цена покупки, sell = цена продажи (за 1 шт. или за пачку, если per > 1).
+          # Нет buy - предмет нельзя купить. Нет sell - нельзя продать. sell: 0 - принимается бесплатно.
+          # id - название предмета Nukkit (можно id:meta, напр. dye:4). Если предмет не найден - смотри консоль при старте или /shopreload.
+          # Продаются только целые предметы без чар и без своего названия.
+          categories:
+            - title: "Блоки"
+              items:
+                - {id: "cobblestone", name: "Булыжник", sell: 0}
+                - {id: "stone", name: "Камень", sell: 0}
+                - {id: "sand", name: "Песок", sell: 0}
+                - {id: "gravel", name: "Гравий", sell: 0}
+                - {id: "log", name: "Дубовое бревно", buy: 10, sell: 3}
+                - {id: "planks", name: "Дубовые доски", buy: 3, sell: 1}
+                - {id: "glass", name: "Стекло", buy: 8, sell: 3}
+                - {id: "brick_block", name: "Кирпичи", buy: 12, sell: 4}
+                - {id: "clay_block", name: "Глина", buy: 8, sell: 2}
+                - {id: "wool", name: "Шерсть", buy: 10, sell: 3}
+                - {id: "obsidian", name: "Обсидиан", buy: 120, sell: 40}
+            - title: "Еда"
+              items:
+                - {id: "apple", name: "Яблоко", buy: 10, sell: 3}
+                - {id: "bread", name: "Хлеб", buy: 12, sell: 4}
+                - {id: "cooked_chicken", name: "Жареная курица", buy: 15, sell: 5}
+                - {id: "cooked_beef", name: "Стейк", buy: 20, sell: 7}
+                - {id: "pumpkin_pie", name: "Тыквенный пирог", buy: 18, sell: 6}
+                - {id: "golden_carrot", name: "Золотая морковь", buy: 25, sell: 8}
+                - {id: "golden_apple", name: "Золотое яблоко", buy: 150, sell: 50}
+            - title: "Ресурсы"
+              items:
+                - {id: "coal", name: "Уголь", buy: 15, sell: 5}
+                - {id: "copper_ingot", name: "Медный слиток", buy: 20, sell: 7}
+                - {id: "iron_ingot", name: "Железный слиток", buy: 40, sell: 14}
+                - {id: "gold_ingot", name: "Золотой слиток", buy: 80, sell: 28}
+                - {id: "redstone", name: "Красная пыль", buy: 10, sell: 3}
+                - {id: "dye:4", name: "Лазурит", buy: 12, sell: 4}
+                - {id: "emerald", name: "Изумруд", buy: 200, sell: 70}
+                - {id: "diamond", name: "Алмаз", buy: 300, sell: 100}
+                - {id: "netherite_ingot", name: "Незеритовый слиток", buy: 5000, sell: 1500}
+            - title: "Инструменты и оружие"
+              items:
+                - {id: "iron_pickaxe", name: "Железная кирка", buy: 120, sell: 40}
+                - {id: "diamond_pickaxe", name: "Алмазная кирка", buy: 900, sell: 300}
+                - {id: "iron_sword", name: "Железный меч", buy: 100, sell: 35}
+                - {id: "diamond_sword", name: "Алмазный меч", buy: 800, sell: 280}
+                - {id: "netherite_sword", name: "Незеритовый меч", buy: 6000, sell: 2000}
+                - {id: "bow", name: "Лук", buy: 60, sell: 20}
+                - {id: "arrow", name: "Стрелы (16 шт.)", buy: 40, sell: 12, per: 16}
+                - {id: "shield", name: "Щит", buy: 80, sell: 25}
+            - title: "Лёгкая броня"
+              items:
+                - {id: "leather_helmet", name: "Кожаный шлем", buy: 50, sell: 15}
+                - {id: "leather_chestplate", name: "Кожаный нагрудник", buy: 80, sell: 25}
+                - {id: "leather_leggings", name: "Кожаные поножи", buy: 70, sell: 20}
+                - {id: "leather_boots", name: "Кожаные ботинки", buy: 40, sell: 12}
+                - {id: "chainmail_helmet", name: "Кольчужный шлем", buy: 150, sell: 50}
+                - {id: "chainmail_chestplate", name: "Кольчужный нагрудник", buy: 240, sell: 80}
+                - {id: "chainmail_leggings", name: "Кольчужные поножи", buy: 210, sell: 70}
+                - {id: "chainmail_boots", name: "Кольчужные ботинки", buy: 120, sell: 40}
+                - {id: "turtle_helmet", name: "Панцирь черепахи", buy: 400, sell: 130}
+            - title: "Тяжёлая броня"
+              items:
+                - {id: "iron_helmet", name: "Железный шлем", buy: 200, sell: 70}
+                - {id: "iron_chestplate", name: "Железный нагрудник", buy: 320, sell: 110}
+                - {id: "iron_leggings", name: "Железные поножи", buy: 280, sell: 95}
+                - {id: "iron_boots", name: "Железные ботинки", buy: 160, sell: 55}
+                - {id: "diamond_helmet", name: "Алмазный шлем", buy: 1500, sell: 500}
+                - {id: "diamond_chestplate", name: "Алмазный нагрудник", buy: 2400, sell: 800}
+                - {id: "diamond_leggings", name: "Алмазные поножи", buy: 2100, sell: 700}
+                - {id: "diamond_boots", name: "Алмазные ботинки", buy: 1200, sell: 400}
+                - {id: "netherite_helmet", name: "Незеритовый шлем", buy: 6500, sell: 2200}
+                - {id: "netherite_chestplate", name: "Незеритовый нагрудник", buy: 7400, sell: 2500}
+                - {id: "netherite_leggings", name: "Незеритовые поножи", buy: 7100, sell: 2400}
+                - {id: "netherite_boots", name: "Незеритовые ботинки", buy: 6200, sell: 2100}
+            - title: "Разное"
+              items:
+                - {id: "torch", name: "Факелы (16 шт.)", buy: 15, sell: 4, per: 16}
+                - {id: "crafting_table", name: "Верстак", buy: 20, sell: 6}
+                - {id: "furnace", name: "Печь", buy: 25, sell: 8}
+                - {id: "chest", name: "Сундук", buy: 30, sell: 10}
+                - {id: "bed", name: "Кровать", buy: 60, sell: 20}
+                - {id: "bucket:8", name: "Ведро воды", buy: 30, sell: 10}
+                - {id: "piston", name: "Поршень", buy: 90, sell: 30}
+                - {id: "anvil", name: "Наковальня", buy: 400, sell: 130}
+                - {id: "experience_bottle", name: "Бутылочка опыта", buy: 100, sell: 30}
+                - {id: "ender_pearl", name: "Жемчуг Края", buy: 250, sell: 80}
+          EOF_SHOP
+          cat > src/main/java/shop/Shop.java <<'EOF_SHOP'
+          package shop;
+
+          import cn.nukkit.Player;
+          import cn.nukkit.command.Command;
+          import cn.nukkit.command.CommandSender;
+          import cn.nukkit.event.EventHandler;
+          import cn.nukkit.event.Listener;
+          import cn.nukkit.event.player.PlayerFormRespondedEvent;
+          import cn.nukkit.event.player.PlayerQuitEvent;
+          import cn.nukkit.form.element.ElementButton;
+          import cn.nukkit.form.element.ElementDropdown;
+          import cn.nukkit.form.element.ElementLabel;
+          import cn.nukkit.form.element.ElementSlider;
+          import cn.nukkit.form.element.ElementToggle;
+          import cn.nukkit.form.response.FormResponseCustom;
+          import cn.nukkit.form.response.FormResponseSimple;
+          import cn.nukkit.form.window.FormWindowCustom;
+          import cn.nukkit.form.window.FormWindowSimple;
+          import cn.nukkit.inventory.PlayerInventory;
+          import cn.nukkit.item.Item;
+          import cn.nukkit.plugin.Plugin;
+          import cn.nukkit.plugin.PluginBase;
+          import cn.nukkit.utils.Config;
+
+          import java.io.File;
+          import java.lang.reflect.Method;
+          import java.util.ArrayList;
+          import java.util.HashMap;
+          import java.util.List;
+          import java.util.Locale;
+          import java.util.Map;
+          import java.util.UUID;
+
+          /**
+           * /shop - системный магазин на формах Bedrock (без виртуальных сундуков).
+           * Деньги идут через TpCoins (вызовы через рефлексию, чтобы не тащить его jar в сборку).
+           */
+          public class Shop extends PluginBase implements Listener {
+
+              private static final int MAIN_SLOTS = 36;
+              private static final int MAX_QTY = 64;
+
+              // ---------- данные ----------
+
+              static final class Entry {
+                  String id;
+                  String name;
+                  long buy = -1;   // -1 = нельзя купить
+                  long sell = -1;  // -1 = нельзя продать, 0 = принимаем бесплатно
+                  int per = 1;     // сколько штук в одной "единице" (пачка)
+                  Item ref;
+              }
+
+              static final class Category {
+                  String title;
+                  List<Entry> items = new ArrayList<>();
+              }
+
+              private static final int F_MAIN = 0;
+              private static final int F_CAT = 1;
+              private static final int F_ITEM = 2;
+
+              static final class Ctx {
+                  int type;
+                  Category cat;
+                  Entry entry;
+                  List<String> modes; // "buy" / "sell" в порядке выпадающего списка
+              }
+
+              private final List<Category> categories = new ArrayList<>();
+              private final Map<UUID, Map<Integer, Ctx>> forms = new HashMap<>();
+              private Eco eco;
+
+              // ---------- мост к TpCoins ----------
+
+              static final class Eco {
+                  private final Object obj;
+                  private final Method mBalance, mRoom, mDeposit, mWithdraw;
+
+                  Eco(Plugin tp) throws Exception {
+                      obj = tp.getClass().getMethod("getEconomy").invoke(tp);
+                      Class<?> c = obj.getClass();
+                      mBalance = c.getMethod("getBalance", String.class);
+                      mRoom = c.getMethod("getRoom", String.class);
+                      mDeposit = c.getMethod("deposit", String.class, long.class, String.class);
+                      mWithdraw = c.getMethod("withdraw", String.class, long.class, String.class);
+                  }
+
+                  long balance(String key) throws Exception {
+                      return (Long) mBalance.invoke(obj, key);
+                  }
+
+                  long room(String key) throws Exception {
+                      return (Long) mRoom.invoke(obj, key);
+                  }
+
+                  /** Возвращает имя Result: OK, NOT_ENOUGH, OVER_LIMIT, NO_ACCOUNT, INVALID_AMOUNT ... */
+                  String deposit(String key, long amount, String reason) throws Exception {
+                      return String.valueOf(mDeposit.invoke(obj, key, amount, reason));
+                  }
+
+                  String withdraw(String key, long amount, String reason) throws Exception {
+                      return String.valueOf(mWithdraw.invoke(obj, key, amount, reason));
+                  }
+              }
+
+              private static String key(Player p) {
+                  return p.getName().trim().toLowerCase(Locale.ROOT).replace(' ', '_');
+              }
+
+              // ---------- жизненный цикл ----------
+
+              @Override
+              public void onEnable() {
+                  saveResource("shop.yml");
+                  Plugin tp = getServer().getPluginManager().getPlugin("TpCoins");
+                  if (tp == null) {
+                      getLogger().error("TpCoins не найден - магазин отключён.");
+                      getServer().getPluginManager().disablePlugin(this);
+                      return;
+                  }
+                  try {
+                      eco = new Eco(tp);
+                  } catch (Exception e) {
+                      getLogger().error("Не удалось подключиться к экономике TpCoins: " + e, e);
+                      getServer().getPluginManager().disablePlugin(this);
+                      return;
+                  }
+                  getServer().getPluginManager().registerEvents(this, this);
+                  List<String> problems = loadShop();
+                  int total = 0;
+                  for (Category c : categories) total += c.items.size();
+                  getLogger().info("Магазин загружен: категорий " + categories.size() + ", предметов " + total + ".");
+                  for (String s : problems) getLogger().warning(s);
+              }
+
+              @Override
+              public void onDisable() {
+                  forms.clear();
+              }
+
+              @EventHandler
+              public void onQuit(PlayerQuitEvent e) {
+                  forms.remove(e.getPlayer().getUniqueId());
+              }
+
+              // ---------- загрузка shop.yml ----------
+
+              private List<String> loadShop() {
+                  List<String> problems = new ArrayList<>();
+                  categories.clear();
+                  Config cfg = new Config(new File(getDataFolder(), "shop.yml"), Config.YAML);
+                  List<?> rawCats = cfg.getList("categories");
+                  if (rawCats == null) {
+                      problems.add("shop.yml: нет списка categories.");
+                      return problems;
+                  }
+                  for (Object oc : rawCats) {
+                      if (!(oc instanceof Map)) continue;
+                      Map<?, ?> mc = (Map<?, ?>) oc;
+                      Category cat = new Category();
+                      cat.title = String.valueOf(mc.get("title"));
+                      Object rawItems = mc.get("items");
+                      if (rawItems instanceof List) {
+                          for (Object oi : (List<?>) rawItems) {
+                              if (!(oi instanceof Map)) continue;
+                              Map<?, ?> mi = (Map<?, ?>) oi;
+                              Entry en = new Entry();
+                              en.id = String.valueOf(mi.get("id"));
+                              en.name = String.valueOf(mi.get("name"));
+                              en.buy = num(mi.get("buy"), -1);
+                              en.sell = num(mi.get("sell"), -1);
+                              en.per = (int) Math.max(1, num(mi.get("per"), 1));
+                              Item ref = null;
+                              try {
+                                  ref = Item.fromString(en.id);
+                              } catch (Exception ignored) {
+                              }
+                              if (ref == null || ref.getId() == 0) {
+                                  problems.add("shop.yml: предмет не найден: \"" + en.id + "\" (" + en.name + ") - пропущен.");
+                                  continue;
+                              }
+                              ref.setCount(1);
+                              en.ref = ref;
+                              if (en.buy < 0 && en.sell < 0) continue;
+                              cat.items.add(en);
+                          }
+                      }
+                      if (!cat.items.isEmpty()) categories.add(cat);
+                  }
+                  return problems;
+              }
+
+              private static long num(Object o, long def) {
+                  return (o instanceof Number) ? ((Number) o).longValue() : def;
+              }
+
+              // ---------- команды ----------
+
+              @Override
+              public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+                  String name = command.getName().toLowerCase(Locale.ROOT);
+                  if (name.equals("shop")) {
+                      if (!(sender instanceof Player)) {
+                          sender.sendMessage("Эта команда только для игроков.");
+                          return true;
+                      }
+                      openMain((Player) sender);
+                      return true;
+                  }
+                  if (name.equals("shopreload")) {
+                      List<String> problems = loadShop();
+                      int total = 0;
+                      for (Category c : categories) total += c.items.size();
+                      sender.sendMessage("§aМагазин перезагружен: категорий " + categories.size() + ", предметов " + total + ".");
+                      for (String s : problems) sender.sendMessage("§e" + s);
+                      return true;
+                  }
+                  return false;
+              }
+
+              // ---------- показ форм ----------
+
+              private void show(Player p, cn.nukkit.form.window.FormWindow w, Ctx ctx) {
+                  int id = p.showFormWindow(w);
+                  forms.computeIfAbsent(p.getUniqueId(), k -> new HashMap<>()).put(id, ctx);
+              }
+
+              private void openMain(Player p) {
+                  if (categories.isEmpty()) {
+                      p.sendMessage("§cМагазин пуст.");
+                      return;
+                  }
+                  long bal = safeBalance(p);
+                  FormWindowSimple f = new FormWindowSimple("§l Магазин", "Баланс: §a" + bal + "§r монет\nВыбери категорию:");
+                  for (Category c : categories) f.addButton(new ElementButton(c.title));
+                  Ctx ctx = new Ctx();
+                  ctx.type = F_MAIN;
+                  show(p, f, ctx);
+              }
+
+              private void openCategory(Player p, Category cat) {
+                  long bal = safeBalance(p);
+                  FormWindowSimple f = new FormWindowSimple(cat.title, "Баланс: §a" + bal + "§r монет\n§7Купить / Продать");
+                  for (Entry e : cat.items) {
+                      f.addButton(new ElementButton(e.name + "\n" + priceLine(e)));
+                  }
+                  f.addButton(new ElementButton("« Назад"));
+                  Ctx ctx = new Ctx();
+                  ctx.type = F_CAT;
+                  ctx.cat = cat;
+                  show(p, f, ctx);
+              }
+
+              private static String priceLine(Entry e) {
+                  String b = e.buy >= 0 ? String.valueOf(e.buy) : "-";
+                  String s = e.sell >= 0 ? String.valueOf(e.sell) : "-";
+                  return "Купить: " + b + "  Продать: " + s;
+              }
+
+              private void openItem(Player p, Category cat, Entry e, String message) {
+                  long bal = safeBalance(p);
+                  int have = count(p.getInventory(), e.ref);
+                  StringBuilder sb = new StringBuilder();
+                  sb.append("§l").append(e.name).append("§r\n");
+                  if (e.per > 1) sb.append("Цены указаны за ").append(e.per).append(" шт.\n");
+                  sb.append("Купить: ").append(e.buy >= 0 ? e.buy + " монет" : "нельзя").append("\n");
+                  sb.append("Продать: ").append(e.sell >= 0 ? e.sell + " монет" : "нельзя").append("\n");
+                  sb.append("Баланс: §a").append(bal).append("§r | В инвентаре: ").append(have).append(" шт.");
+                  if (message != null && !message.isEmpty()) sb.append("\n\n").append(message);
+
+                  List<String> modes = new ArrayList<>();
+                  List<String> modeLabels = new ArrayList<>();
+                  if (e.buy >= 0) {
+                      modes.add("buy");
+                      modeLabels.add("Купить");
+                  }
+                  if (e.sell >= 0) {
+                      modes.add("sell");
+                      modeLabels.add("Продать");
+                  }
+
+                  FormWindowCustom f = new FormWindowCustom(e.name);
+                  f.addElement(new ElementLabel(sb.toString()));                                  // 0
+                  f.addElement(new ElementDropdown("Действие", modeLabels, 0));                   // 1
+                  f.addElement(new ElementSlider("Количество" + (e.per > 1 ? " (пачек)" : ""), 1, MAX_QTY, 1, 1)); // 2
+                  f.addElement(new ElementToggle("Продать всё (игнорирует количество)", false));  // 3
+                  f.addElement(new ElementToggle("« Назад в категорию (без сделки)", false));     // 4
+                  Ctx ctx = new Ctx();
+                  ctx.type = F_ITEM;
+                  ctx.cat = cat;
+                  ctx.entry = e;
+                  ctx.modes = modes;
+                  show(p, f, ctx);
+              }
+
+              // ---------- обработка ответов ----------
+
+              @EventHandler
+              public void onForm(PlayerFormRespondedEvent ev) {
+                  Player p = ev.getPlayer();
+                  Map<Integer, Ctx> m = forms.get(p.getUniqueId());
+                  if (m == null) return;
+                  Ctx ctx = m.remove(ev.getFormID());
+                  if (ctx == null) return;
+                  if (ev.wasClosed() || ev.getResponse() == null) return;
+                  try {
+                      switch (ctx.type) {
+                          case F_MAIN: {
+                              FormResponseSimple r = (FormResponseSimple) ev.getResponse();
+                              int i = r.getClickedButtonId();
+                              if (i >= 0 && i < categories.size()) openCategory(p, categories.get(i));
+                              break;
+                          }
+                          case F_CAT: {
+                              FormResponseSimple r = (FormResponseSimple) ev.getResponse();
+                              int i = r.getClickedButtonId();
+                              if (i >= 0 && i < ctx.cat.items.size()) {
+                                  openItem(p, ctx.cat, ctx.cat.items.get(i), null);
+                              } else {
+                                  openMain(p);
+                              }
+                              break;
+                          }
+                          case F_ITEM: {
+                              FormResponseCustom r = (FormResponseCustom) ev.getResponse();
+                              if (r.getToggleResponse(4)) {
+                                  openCategory(p, ctx.cat);
+                                  break;
+                              }
+                              int modeIdx = r.getDropdownResponse(1).getElementID();
+                              if (modeIdx < 0 || modeIdx >= ctx.modes.size()) return;
+                              String mode = ctx.modes.get(modeIdx);
+                              int qty = Math.max(1, Math.round(r.getSliderResponse(2)));
+                              boolean all = r.getToggleResponse(3);
+                              String msg = mode.equals("buy")
+                                      ? doBuy(p, ctx.entry, qty)
+                                      : doSell(p, ctx.entry, qty, all);
+                              openItem(p, ctx.cat, ctx.entry, msg);
+                              break;
+                          }
+                          default:
+                              break;
+                      }
+                  } catch (Exception ex) {
+                      p.sendMessage("§cОшибка магазина. Сообщи администратору.");
+                      getLogger().error("Ошибка формы магазина: " + ex, ex);
+                  }
+              }
+
+              // ---------- покупка / продажа ----------
+
+              private String doBuy(Player p, Entry e, int qty) throws Exception {
+                  if (e.buy < 0) return "§cЭтот предмет нельзя купить.";
+                  long cost = e.buy * qty;
+                  long totalItems = (long) e.per * qty;
+                  PlayerInventory inv = p.getInventory();
+                  if (capacity(inv, e.ref) < totalItems) {
+                      return "§cНедостаточно места в инвентаре.";
+                  }
+                  String k = key(p);
+                  if (eco.balance(k) < cost) {
+                      return "§cНедостаточно монет. Нужно: " + cost + ".";
+                  }
+                  if (cost > 0) {
+                      String res = eco.withdraw(k, cost, "shop buy " + e.id + " x" + totalItems);
+                      if (!res.equals("OK")) {
+                          return res.equals("NOT_ENOUGH") ? "§cНедостаточно монет." : "§cОшибка оплаты: " + res;
+                      }
+                  }
+                  Item give = e.ref.clone();
+                  give.setCount((int) totalItems);
+                  Item[] left = inv.addItem(give);
+                  for (Item it : left) {
+                      if (it != null && !it.isNull()) p.getLevel().dropItem(p, it);
+                  }
+                  return "§aКуплено: " + e.name + " x" + qty + " за " + cost + " монет.";
+              }
+
+              private String doSell(Player p, Entry e, int qty, boolean all) throws Exception {
+                  if (e.sell < 0) return "§cЭтот предмет нельзя продать.";
+                  PlayerInventory inv = p.getInventory();
+                  int have = count(inv, e.ref);
+                  int units = have / e.per;
+                  if (units <= 0) {
+                      return "§cУ тебя нет подходящих предметов (нужны целые, без чар и без названия).";
+                  }
+                  if (all) qty = units;
+                  if (qty > units) {
+                      return "§cУ тебя только " + have + " шт., а нужно " + (qty * e.per) + ".";
+                  }
+                  long total = e.sell * qty;
+                  String k = key(p);
+                  if (total > 0 && total > eco.room(k)) {
+                      return "§cНа балансе не поместится столько монет.";
+                  }
+                  int toRemove = qty * e.per;
+                  remove(inv, e.ref, toRemove);
+                  if (total > 0) {
+                      String res = eco.deposit(k, total, "shop sell " + e.id + " x" + toRemove);
+                      if (!res.equals("OK")) {
+                          // вернуть предметы, деньги не выданы
+                          Item back = e.ref.clone();
+                          back.setCount(toRemove);
+                          for (Item it : inv.addItem(back)) {
+                              if (it != null && !it.isNull()) p.getLevel().dropItem(p, it);
+                          }
+                          return "§cОшибка зачисления монет: " + res + ". Предметы возвращены.";
+                      }
+                  }
+                  return "§aПродано: " + e.name + " x" + qty + " за " + total + " монет.";
+              }
+
+              // ---------- инвентарь ----------
+
+              private static boolean matches(Item slot, Item ref) {
+                  return slot != null && !slot.isNull()
+                          && slot.equals(ref, true, false)
+                          && !slot.hasEnchantments()
+                          && !slot.hasCustomName();
+              }
+
+              private static int count(PlayerInventory inv, Item ref) {
+                  int n = 0;
+                  for (int i = 0; i < MAIN_SLOTS; i++) {
+                      Item s = inv.getItem(i);
+                      if (matches(s, ref)) n += s.getCount();
+                  }
+                  return n;
+              }
+
+              private static long capacity(PlayerInventory inv, Item ref) {
+                  int max = ref.getMaxStackSize();
+                  long cap = 0;
+                  for (int i = 0; i < MAIN_SLOTS; i++) {
+                      Item s = inv.getItem(i);
+                      if (s == null || s.isNull()) {
+                          cap += max;
+                      } else if (s.equals(ref, true, true)) {
+                          cap += Math.max(0, max - s.getCount());
+                      }
+                  }
+                  return cap;
+              }
+
+              private static void remove(PlayerInventory inv, Item ref, int need) {
+                  for (int i = 0; i < MAIN_SLOTS && need > 0; i++) {
+                      Item s = inv.getItem(i);
+                      if (!matches(s, ref)) continue;
+                      int take = Math.min(need, s.getCount());
+                      if (take >= s.getCount()) {
+                          inv.clear(i);
+                      } else {
+                          Item rest = s.clone();
+                          rest.setCount(s.getCount() - take);
+                          inv.setItem(i, rest);
+                      }
+                      need -= take;
+                  }
+              }
+
+              private long safeBalance(Player p) {
+                  try {
+                      return eco.balance(key(p));
+                  } catch (Exception e) {
+                      return 0;
+                  }
+              }
+          }
+          EOF_SHOP
+          mvn -B -q package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Shop-jar
+          path: target/Shop-1.0.0.jar
